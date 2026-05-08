@@ -118,12 +118,12 @@ class Source(AbstractSearchSource):
             timeout,
         )
         if not data:
-            return None, None
+            return None, None, None
         for item in data.get("movie_results", []):
-            return item.get("title") or item.get("original_title", ""), "movie"
+            return item.get("title") or item.get("original_title", ""), "movie", item.get("id")
         for item in data.get("tv_results", []):
-            return item.get("name") or item.get("original_name", ""), "tv"
-        return None, None
+            return item.get("name") or item.get("original_name", ""), "tv", item.get("id")
+        return None, None, None
 
     def _trending_tmdb(self, media_type, ss, timeout):
         kind = "movie" if media_type == "movie" else "tv"
@@ -330,9 +330,10 @@ class Source(AbstractSearchSource):
 
         imdb_id = is_imdb_id(search_string)
         title = None
+        tmdb_id = None
 
         if imdb_id:
-            title, resolved_type = self._resolve_imdb(imdb_id, shared_state, SEARCH_REQUEST_TIMEOUT_SECONDS)
+            title, resolved_type, tmdb_id = self._resolve_imdb(imdb_id, shared_state, SEARCH_REQUEST_TIMEOUT_SECONDS)
             if resolved_type:
                 media_type = resolved_type
         else:
@@ -342,7 +343,7 @@ class Source(AbstractSearchSource):
             warn(f"[mx] impossible de résoudre: {search_string}")
             return []
 
-        debug(f"[mx] recherche '{title}' [{media_type}] S{season}E{episode} — IMDb: {imdb_id}")
+        debug(f"[mx] recherche '{title}' (TMDB:{tmdb_id}) [{media_type}] S{season}E{episode} — IMDb: {imdb_id}")
 
         releases = []
         try:
@@ -351,7 +352,7 @@ class Source(AbstractSearchSource):
                 warn(f"[mx] aucun résultat Movix pour: {title}")
                 return []
 
-            match = self._best_match(results, imdb_id=imdb_id)
+            match = self._best_match(results, imdb_id=imdb_id, tmdb_id=tmdb_id)
             if not match:
                 return []
 
