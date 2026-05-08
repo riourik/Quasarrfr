@@ -5,7 +5,7 @@
 import re
 import sys
 
-__version__ = "4.3.7"
+__version__ = "0.0.3"
 
 
 def get_version():
@@ -23,7 +23,7 @@ def get_latest_version():
     except ImportError:
         return __version__
 
-    api_url = "https://api.github.com/repos/rix1337/Quasarr/releases/latest"
+    api_url = "https://api.github.com/repos/riourik/Quasarrfr/releases/latest"
     resp = requests.get(api_url, headers={"Accept": "application/vnd.github.v3+json"})
     if resp.status_code != 200:
         raise RuntimeError(f"GitHub API error: {resp.status_code} {resp.text}")
