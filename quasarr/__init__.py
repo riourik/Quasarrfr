@@ -303,17 +303,14 @@ def update_checker(shared_state_dict, shared_state_lock):
         shared_state.set_state(shared_state_dict, shared_state_lock)
 
         message = "!!! UPDATE AVAILABLE !!!"
-        link = "https://github.com/rix1337/Quasarr/releases/latest"
+        link = "https://github.com/riourik/Quasarrfr/releases/latest"
 
         shared_state.update("last_checked_version", f"v.{version.get_version()}")
 
         while True:
             try:
                 update_available = version.newer_version_available()
-            except Exception as e:
-                error(
-                    f"Error getting latest version: {e}!\nPlease manually check: <blue>{link}</blue> for more information!"
-                )
+            except Exception:
                 update_available = None
 
             if (
