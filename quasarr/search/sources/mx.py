@@ -200,10 +200,10 @@ class Source(AbstractSearchSource):
                     ep_tag = f".S{int(saison):02d}E{int(ep):02d}"
             safe_title = sanitize(r_title)
             safe_quality = sanitize(quality)
-            release_title = (
-                f"{safe_title}.{r_year}{ep_tag}.{safe_quality}"
-                f".Movix{host_tag}{lang_tag}"
-            )
+            if result.get("is_series"):
+                release_title = f"{safe_title}{ep_tag}.{safe_quality}.Movix{host_tag}{lang_tag}"
+            else:
+                release_title = f"{safe_title}.{r_year}.{safe_quality}.Movix{host_tag}{lang_tag}"
 
             source_url = f"https://movix.cash/download/{media_type}/{r_tmdb}"
 
