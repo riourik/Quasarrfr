@@ -95,7 +95,7 @@ class Source(AbstractSearchSource):
         )
         if not data:
             return None
-        return data.get("url") or data.get("link") or data.get("download_url")
+        return data.get("embed_url") or data.get("url") or data.get("link")
 
     # ------------------------------------------------------------------ #
     #  TMDB  (résolution IMDb ID → titre)                                  #
