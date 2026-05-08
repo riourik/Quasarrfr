@@ -183,16 +183,17 @@ class Source(AbstractSearchSource):
             size_mb = round(size_bytes / (1024 * 1024), 2) if size_bytes else 0
             date_str = self._to_rfc2822(link.get("upload_date", ""))
 
-            lang_tag = f".[{language.replace(', ', '-')}]" if language else ""
+            lang_tag = f".{language.replace(', ', '-').replace(' ', '')}" if language else ""
             ep_tag = ""
             if result.get("is_series"):
                 saison = link.get("saison")
                 ep = link.get("episode")
                 if saison and ep:
                     ep_tag = f".S{int(saison):02d}E{int(ep):02d}"
+            safe_title = r_title.replace(" ", ".").replace(":", "").replace("'", "").replace("(", "").replace(")", "")
             release_title = (
-                f"{r_title}.({r_year}){ep_tag}.{quality.replace(' ', '.')}"
-                f".{host}.[Movix]{lang_tag}"
+                f"{safe_title}.{r_year}{ep_tag}.{quality.replace(' ', '.')}"
+                f".Movix{lang_tag}"
             )
 
             source_url = f"https://movix.cash/download/{media_type}/{r_tmdb}"
