@@ -205,9 +205,9 @@ class Source(AbstractSearchSource):
                 elif "blu" in q_lower:
                     res += "BluRay"
                 elif "hdts" in q_lower or "ts" in q_lower:
-                    res += "HDTS"
+                    res += "HDTV"
                 elif "hdcam" in q_lower or "cam" in q_lower:
-                    res += "CAM"
+                    res += "HDTV"
                 elif "web" in q_lower:
                     res += "WEBDL"
                 elif "hdlight" in q_lower:
