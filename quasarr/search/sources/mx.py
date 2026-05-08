@@ -210,7 +210,9 @@ class Source(AbstractSearchSource):
                     res += "CAM"
                 elif "web" in q_lower:
                     res += "WEBDL"
-                elif "hdlight" in q_lower or "hdtv" in q_lower:
+                elif "hdlight" in q_lower:
+                    res += "WEBRip"
+                elif "hdtv" in q_lower:
                     res += "HDTV"
                 else:
                     res += sanitize(q)
