@@ -183,14 +183,16 @@ class Source(AbstractSearchSource):
             size_mb = round(size_bytes / (1024 * 1024), 2) if size_bytes else 0
             date_str = self._to_rfc2822(link.get("upload_date", ""))
 
-            def sanitize(s):
-                for ch in " :()'\"[]()":
+            def sanitize(s, remove_dash=False):
+                for ch in " :()'\"[](),":
                     s = s.replace(ch, ".")
+                if remove_dash:
+                    s = s.replace("-", "")
                 import re as _re
                 s = _re.sub(r"\.{2,}", ".", s).strip(".")
                 return s
 
-            lang_tag = f".{sanitize(language)}" if language else ""
+            lang_tag = f".{sanitize(language, remove_dash=True)}" if language else ""
             host_tag = f".{sanitize(host)}" if host else ""
             ep_tag = ""
             if result.get("is_series"):
@@ -199,7 +201,7 @@ class Source(AbstractSearchSource):
                 if saison and ep:
                     ep_tag = f".S{int(saison):02d}E{int(ep):02d}"
             safe_title = sanitize(r_title)
-            safe_quality = sanitize(quality)
+            safe_quality = sanitize(quality, remove_dash=True)
             if result.get("is_series"):
                 release_title = f"{safe_title}{ep_tag}.{safe_quality}.Movix{host_tag}{lang_tag}"
             else:
