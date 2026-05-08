@@ -183,16 +183,45 @@ class Source(AbstractSearchSource):
             size_mb = round(size_bytes / (1024 * 1024), 2) if size_bytes else 0
             date_str = self._to_rfc2822(link.get("upload_date", ""))
 
-            def sanitize(s, remove_dash=False):
-                for ch in " :()'\"[](),":
-                    s = s.replace(ch, ".")
-                if remove_dash:
-                    s = s.replace("-", "")
+            def sanitize(s):
                 import re as _re
+                for ch in " :()'\"[](),-":
+                    s = s.replace(ch, ".")
                 s = _re.sub(r"\.{2,}", ".", s).strip(".")
                 return s
 
-            lang_tag = f".{sanitize(language, remove_dash=True)}" if language else ""
+            def normalize_quality(q):
+                import re as _re
+                q_lower = q.lower()
+                res = ""
+                if "4k" in q_lower or "2160" in q_lower:
+                    res += "2160p."
+                elif "1080" in q_lower:
+                    res += "1080p."
+                elif "720" in q_lower:
+                    res += "720p."
+                if "remux" in q_lower:
+                    res += "BluRay.REMUX"
+                elif "blu" in q_lower:
+                    res += "BluRay"
+                elif "hdts" in q_lower or "ts" in q_lower:
+                    res += "HDTS"
+                elif "hdcam" in q_lower or "cam" in q_lower:
+                    res += "CAM"
+                elif "web" in q_lower:
+                    res += "WEBDL"
+                elif "hdlight" in q_lower or "hdtv" in q_lower:
+                    res += "HDTV"
+                else:
+                    res += sanitize(q)
+                codec = ""
+                if "x265" in q_lower or "hevc" in q_lower or "h265" in q_lower:
+                    codec = ".x265"
+                elif "x264" in q_lower or "h264" in q_lower or "avc" in q_lower:
+                    codec = ".x264"
+                return res.strip(".") + codec
+
+            lang_tag = f".{sanitize(language)}" if language else ""
             host_tag = f".{sanitize(host)}" if host else ""
             ep_tag = ""
             if result.get("is_series"):
@@ -201,7 +230,7 @@ class Source(AbstractSearchSource):
                 if saison and ep:
                     ep_tag = f".S{int(saison):02d}E{int(ep):02d}"
             safe_title = sanitize(r_title)
-            safe_quality = sanitize(quality, remove_dash=True)
+            safe_quality = normalize_quality(quality)
             if result.get("is_series"):
                 release_title = f"{safe_title}{ep_tag}.{safe_quality}.Movix{host_tag}{lang_tag}"
             else:
