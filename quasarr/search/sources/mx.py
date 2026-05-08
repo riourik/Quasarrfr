@@ -73,16 +73,24 @@ class Source(AbstractSearchSource):
         data = self._get(MOVIX_API, "/search", {"title": title}, ss, timeout)
         return data.get("results", []) if data else []
 
-    def _get_links(self, darkiworld_id, tmdb_id, media_type, ss, timeout):
+    def _get_links(self, darkiworld_id, tmdb_id, media_type, ss, timeout, season=None, episode=None):
+        params = {"tmdbId": tmdb_id}
+        if media_type == "tv":
+            if not season or not episode:
+                return []
+            params["season"] = season
+            params["episode"] = episode
         data = self._get(
             MOVIX_API,
             f"/darkiworld/download/{media_type}/{darkiworld_id}",
-            {"tmdbId": tmdb_id},
+            params,
             ss,
             timeout,
         )
         if data and data.get("success"):
             return data.get("all", [])
+        if data and not data.get("success"):
+            debug(f"[mx] download {media_type}/{darkiworld_id}: {data.get('error', 'unknown error')}")
         return []
 
     def _decode_link(self, link_id, darkiworld_id, ss, timeout):
@@ -114,7 +122,7 @@ class Source(AbstractSearchSource):
         for item in data.get("movie_results", []):
             return item.get("title") or item.get("original_title", ""), "movie"
         for item in data.get("tv_results", []):
-            return item.get("name") or item.get("original_name", ""), "show"
+            return item.get("name") or item.get("original_name", ""), "tv"
         return None, None
 
     def _trending_tmdb(self, media_type, ss, timeout):
@@ -160,7 +168,7 @@ class Source(AbstractSearchSource):
         r_year = result.get("year", "")
         r_imdb = result.get("imdb_id")
         r_tmdb = result.get("tmdb_id", "")
-        media_type = "show" if result.get("is_series") else "movie"
+        media_type = "tv" if result.get("is_series") else "movie"
 
         for link in links:
             real_url = self._decode_link(link["id"], darkiworld_id, ss, timeout)
@@ -176,8 +184,14 @@ class Source(AbstractSearchSource):
             date_str = self._to_rfc2822(link.get("upload_date", ""))
 
             lang_tag = f".[{language.replace(', ', '-')}]" if language else ""
+            ep_tag = ""
+            if result.get("is_series"):
+                saison = link.get("saison")
+                ep = link.get("episode")
+                if saison and ep:
+                    ep_tag = f".S{int(saison):02d}E{int(ep):02d}"
             release_title = (
-                f"{r_title}.({r_year}).{quality.replace(' ', '.')}"
+                f"{r_title}.({r_year}){ep_tag}.{quality.replace(' ', '.')}"
                 f".{host}.[Movix]{lang_tag}"
             )
 
@@ -213,12 +227,11 @@ class Source(AbstractSearchSource):
     ) -> list[SearchRelease]:
 
         base_cat = get_base_search_category_id(search_category)
-        if base_cat == SEARCH_CAT_SHOWS:
-            media_type = "show"
-        elif base_cat == SEARCH_CAT_MOVIES:
+        if base_cat == SEARCH_CAT_MOVIES:
             media_type = "movie"
         else:
-            warn(f"[mx] catégorie non supportée: {search_category}")
+            # TV requires season+episode params — feed mode can't provide them
+            debug(f"[mx] feed: skip TV (season/episode requis par l'API)")
             return []
 
         releases = []
@@ -268,7 +281,7 @@ class Source(AbstractSearchSource):
 
         base_cat = get_base_search_category_id(search_category)
         if base_cat == SEARCH_CAT_SHOWS:
-            media_type = "show"
+            media_type = "tv"
         else:
             media_type = "movie"
 
@@ -286,7 +299,7 @@ class Source(AbstractSearchSource):
             warn(f"[mx] impossible de résoudre: {search_string}")
             return []
 
-        debug(f"[mx] recherche '{title}' [{media_type}] — IMDb: {imdb_id}")
+        debug(f"[mx] recherche '{title}' [{media_type}] S{season}E{episode} — IMDb: {imdb_id}")
 
         releases = []
         try:
@@ -301,7 +314,8 @@ class Source(AbstractSearchSource):
 
             links = self._get_links(
                 match["id"], match.get("tmdb_id"), media_type,
-                shared_state, SEARCH_REQUEST_TIMEOUT_SECONDS
+                shared_state, SEARCH_REQUEST_TIMEOUT_SECONDS,
+                season=season, episode=episode
             )
             releases = self._build_releases(match, links, shared_state, SEARCH_REQUEST_TIMEOUT_SECONDS)
 
