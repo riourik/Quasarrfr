@@ -83,7 +83,12 @@ def setup_arr_routes(app):
         imdb_id = decoded_payload["imdb_id"] or ""
         source_key = decoded_payload["source_key"] or ""
 
-        return f'<nzb><file title="{title}" url="{url}" size_mb="{size_mb}" password="{password}" imdb_id="{imdb_id}" source_key="{source_key}"/></nzb>'
+        title_a = sax_utils.quoteattr(title)
+        url_a = sax_utils.quoteattr(url)
+        password_a = sax_utils.quoteattr(password)
+        imdb_a = sax_utils.quoteattr(imdb_id)
+        source_a = sax_utils.quoteattr(source_key)
+        return f'<nzb><file title={title_a} url={url_a} size_mb="{size_mb}" password={password_a} imdb_id={imdb_a} source_key={source_a}/></nzb>'
 
     @app.post("/api")
     @require_api_key
