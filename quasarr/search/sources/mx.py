@@ -5,6 +5,8 @@
 import time
 from datetime import datetime, timezone
 
+import os
+
 import requests
 
 from quasarr.constants import (
@@ -26,7 +28,6 @@ from quasarr.search.sources.helpers.search_source import AbstractSearchSource
 
 MOVIX_API = "https://api.movix.cash/api"
 TMDB_API = "https://api.themoviedb.org/3"
-TMDB_KEY = "f3d757824f08ea2cff45eb8f47ca3a1e"
 
 
 class Source(AbstractSearchSource):
@@ -109,11 +110,15 @@ class Source(AbstractSearchSource):
     #  TMDB  (résolution IMDb ID → titre)                                  #
     # ------------------------------------------------------------------ #
 
+    def _tmdb_key(self, ss):
+        return os.environ.get("MX_TMDB_API_KEY") or ss.values["config"]("MX").get("tmdb_api_key") or ""
+
     def _resolve_imdb(self, imdb_id, ss, timeout):
+        tmdb_key = self._tmdb_key(ss)
         data = self._get(
             TMDB_API,
             f"/find/{imdb_id}",
-            {"api_key": TMDB_KEY, "external_source": "imdb_id", "language": "fr-FR"},
+            {"api_key": tmdb_key, "external_source": "imdb_id", "language": "fr-FR"},
             ss,
             timeout,
         )
@@ -127,10 +132,11 @@ class Source(AbstractSearchSource):
 
     def _trending_tmdb(self, media_type, ss, timeout):
         kind = "movie" if media_type == "movie" else "tv"
+        tmdb_key = self._tmdb_key(ss)
         data = self._get(
             TMDB_API,
             f"/trending/{kind}/week",
-            {"api_key": TMDB_KEY, "language": "fr-FR"},
+            {"api_key": tmdb_key, "language": "fr-FR"},
             ss,
             timeout,
         )

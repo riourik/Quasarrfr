@@ -2,6 +2,9 @@
 
 .claude/*.local.json
 
+# Hostnames locaux (non destinés à l'upstream)
+hostnames.txt
+
 # Python
 *.pyc
 *.bak

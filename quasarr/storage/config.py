@@ -45,6 +45,7 @@ class Config(object):
         "DL": [("user", "secret", ""), ("password", "secret", "")],
         "NX": [("user", "secret", ""), ("password", "secret", "")],
         "JUNKIES": [("user", "secret", ""), ("password", "secret", "")],
+        "MX": [("tmdb_api_key", "secret", "")],
     }
     __config__ = []
 
