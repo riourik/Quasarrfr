@@ -57,11 +57,8 @@ def run():
         sys.stdout = Unbuffered(sys.stdout)
 
         print(f"""┌────────────────────────────────────┐
-  Quasarr 4.3.7 by RiX
+  Quasarr {version.get_version()} by RiX
   https://github.com/rix1337/Quasarr
-  ----
-  Quasarrfr {version.get_version()} by riourik
-  https://github.com/riourik/Quasarrfr
 └────────────────────────────────────┘""")
 
         print("\n===== Recommended Services =====")
@@ -303,7 +300,7 @@ def update_checker(shared_state_dict, shared_state_lock):
         shared_state.set_state(shared_state_dict, shared_state_lock)
 
         message = "!!! UPDATE AVAILABLE !!!"
-        link = "https://github.com/riourik/Quasarrfr/releases/latest"
+        link = "https://github.com/rix1337/Quasarr/releases/latest"
 
         shared_state.update("last_checked_version", f"v.{version.get_version()}")
 
