@@ -149,7 +149,10 @@ class Source(AbstractSearchSource):
             for r in results:
                 if str(r.get("tmdb_id")) == str(tmdb_id):
                     return r
-        return results[0] if results else None
+        # Only fall back to first result when no IDs were provided (pure text search)
+        if not imdb_id and not tmdb_id:
+            return results[0] if results else None
+        return None
 
     @staticmethod
     def _to_rfc2822(date_str):
