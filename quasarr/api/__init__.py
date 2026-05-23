@@ -66,6 +66,7 @@ def get_api(shared_state_dict, shared_state_lock):
     def index():
         protected = shared_state.get_db("protected").retrieve_all_titles()
         api_key = Config("API").get("key")
+        stored_tmdb_key = Config("MX").get("tmdb_api_key") or ""
 
         # Get JDownloader status and modal script
         jd_status = get_jdownloader_status(shared_state)
@@ -325,6 +326,17 @@ def get_api(shared_state_dict, shared_state_lock):
                     <p style="margin-top: 15px;">
                         {render_button("Regenerate API Key", "secondary", {"onclick": "confirmRegenerateApiKey()"})}
                     </p>
+
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--card-border, #dee2e6);">
+                        <div class="input-group">
+                            <label>TMDB API Key <span style="font-weight:400; font-size:0.85em;">(Movix source — <a href="https://www.themoviedb.org/settings/api" target="_blank" style="color:var(--link-color,#0066cc);">free key</a>)</span></label>
+                            <div class="input-row">
+                                <input type="text" id="tmdbKeyInput" placeholder="eyJhbGciOiJIUzI1NiJ9..." value="{stored_tmdb_key}" autocomplete="off" />
+                                <button id="saveTmdbKeyBtn" type="button" onclick="saveTmdbKey()">Save</button>
+                            </div>
+                        </div>
+                        <div id="tmdbKeySaveStatus" class="notification-status"></div>
+                    </div>
 
                     <div class="timeout-slow-mode-section">
                         <label class="timeout-slow-mode-heading">Timeouts</label>
@@ -597,6 +609,13 @@ def get_api(shared_state_dict, shared_state_lock):
                 white-space: nowrap;
                 margin: 0;
                 flex-shrink: 0;
+            }}
+            #saveTmdbKeyBtn {
+                background: var(--btn-primary-bg, #007bff);
+                color: white;
+            }}
+            #saveTmdbKeyBtn:hover {{
+                background: var(--btn-primary-hover, #0056b3);
             }}
             #copyUrl, #copyKey, #fsSubmitBtn {{
                 background: var(--btn-primary-bg, #007bff);
@@ -901,6 +920,37 @@ def get_api(shared_state_dict, shared_state_lock):
                     }};
                 }}
             }})();
+
+            function saveTmdbKey() {{
+                var key = document.getElementById('tmdbKeyInput').value.trim();
+                var statusDiv = document.getElementById('tmdbKeySaveStatus');
+                var btn = document.getElementById('saveTmdbKeyBtn');
+                if (btn) {{ btn.disabled = true; btn.textContent = 'Saving...'; }}
+                statusDiv.style.color = 'var(--text-muted, #666)';
+                statusDiv.innerHTML = 'Saving...';
+                quasarrApiFetch('/api/settings/tmdb-key', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ tmdb_api_key: key }})
+                }})
+                .then(r => r.json())
+                .then(data => {{
+                    if (data.success) {{
+                        statusDiv.style.color = 'var(--status-success-color, #2e7d32)';
+                        statusDiv.innerHTML = key ? '✅ Saved!' : '✅ Key cleared.';
+                    }} else {{
+                        statusDiv.style.color = 'var(--status-error-color, #c62828)';
+                        statusDiv.innerHTML = '❌ ' + (data.error || 'Save failed');
+                    }}
+                }})
+                .catch(err => {{
+                    statusDiv.style.color = 'var(--status-error-color, #c62828)';
+                    statusDiv.innerHTML = '❌ Network error: ' + err.message;
+                }})
+                .finally(() => {{
+                    if (btn) {{ btn.disabled = false; btn.textContent = 'Save'; }}
+                }});
+            }}
 
             function confirmRegenerateApiKey() {{
                 showModal(
