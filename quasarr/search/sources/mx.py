@@ -121,7 +121,13 @@ class Source(AbstractSearchSource):
         )
         if not data:
             return None
-        return data.get("embed_url") or data.get("url") or data.get("link")
+        embed_url = data.get("embed_url")
+        if isinstance(embed_url, dict):
+            # embed_url est un objet (ex: hôte Send) — l'URL réelle est dans "lien"
+            return embed_url.get("lien") or embed_url.get("url") or embed_url.get("link")
+        elif isinstance(embed_url, str) and embed_url:
+            return embed_url
+        return data.get("url") or data.get("link")
 
     # ------------------------------------------------------------------ #
     #  TMDB  (résolution IMDb ID → titre)                                  #
@@ -144,12 +150,14 @@ class Source(AbstractSearchSource):
             timeout,
         )
         if not data:
-            return None, None, None
+            return None, None, None, None
         for item in data.get("movie_results", []):
-            return item.get("title") or item.get("original_title", ""), "movie", item.get("id")
+            year = item.get("release_date", "")[:4] or None
+            return item.get("title") or item.get("original_title", ""), "movie", item.get("id"), year
         for item in data.get("tv_results", []):
-            return item.get("name") or item.get("original_name", ""), "tv", item.get("id")
-        return None, None, None
+            year = item.get("first_air_date", "")[:4] or None
+            return item.get("name") or item.get("original_name", ""), "tv", item.get("id"), year
+        return None, None, None, None
 
     def _trending_tmdb(self, media_type, ss, timeout):
         kind = "movie" if media_type == "movie" else "tv"
@@ -167,26 +175,37 @@ class Source(AbstractSearchSource):
     #  Helpers                                                             #
     # ------------------------------------------------------------------ #
 
-    def _best_match(self, results, imdb_id=None, tmdb_id=None, media_type=None):
+    def _best_match(self, results, imdb_id=None, tmdb_id=None, media_type=None, title=None, year=None):
+        # 1. Match exact par IMDb ID
         if imdb_id:
             for r in results:
                 if r.get("imdb_id") == imdb_id:
                     return r
+        # 2. Match exact par TMDB ID
         if tmdb_id:
             for r in results:
                 if str(r.get("tmdb_id")) == str(tmdb_id):
                     return r
-        # Fallback par type : série → premier is_series=True, film → premier is_series=False
-        if media_type == "tv":
+        # 3. Match par nom exact + année (entrées Movix sans ID synchronisé)
+        if title and (imdb_id or tmdb_id):
+            title_norm = title.lower().strip()
             for r in results:
-                if r.get("is_series"):
-                    return r
-        elif media_type == "movie":
-            for r in results:
-                if not r.get("is_series"):
-                    return r
-        # Fallback générique si aucun ID fourni
+                if r.get("name", "").lower().strip() == title_norm:
+                    desc = str(r.get("description", ""))
+                    if year and str(year) in desc:
+                        return r
+                    elif not year:
+                        return r
+        # 4. Fallback générique uniquement si aucun ID fourni
         if not imdb_id and not tmdb_id:
+            if media_type == "tv":
+                for r in results:
+                    if r.get("is_series"):
+                        return r
+            elif media_type == "movie":
+                for r in results:
+                    if not r.get("is_series"):
+                        return r
             return results[0] if results else None
         return None
 
@@ -372,9 +391,10 @@ class Source(AbstractSearchSource):
         imdb_id = is_imdb_id(search_string)
         title = None
         tmdb_id = None
+        year = None
 
         if imdb_id:
-            title, resolved_type, tmdb_id = self._resolve_imdb(imdb_id, shared_state, SEARCH_REQUEST_TIMEOUT_SECONDS)
+            title, resolved_type, tmdb_id, year = self._resolve_imdb(imdb_id, shared_state, SEARCH_REQUEST_TIMEOUT_SECONDS)
             if resolved_type:
                 media_type = resolved_type
         else:
@@ -389,15 +409,27 @@ class Source(AbstractSearchSource):
         releases = []
         try:
             results = self._search_title(title, shared_state, SEARCH_REQUEST_TIMEOUT_SECONDS)
-            match = self._best_match(results, imdb_id=imdb_id, tmdb_id=tmdb_id, media_type=media_type) if results else None
+            match = self._best_match(results, imdb_id=imdb_id, tmdb_id=tmdb_id, media_type=media_type, title=title, year=year) if results else None
 
-            # Si pas de match par titre+ID, essayer recherche directe par IMDb ID
-            if not match and imdb_id:
-                debug(f"[mx] recherche directe par IMDb ID: {imdb_id}")
-                results_imdb = self._search_by_imdb(imdb_id, shared_state, SEARCH_REQUEST_TIMEOUT_SECONDS)
-                if results_imdb:
-                    match = results_imdb[0]
-                    debug(f"[mx] trouvé via IMDb direct: {match.get('name')} (TMDB:{match.get('tmdb_id')})")
+            if not match and tmdb_id:
+                # Movix indexe parfois le contenu par TMDB ID sans l'exposer dans la recherche
+                debug(f"[mx] accès direct TMDB ID {tmdb_id} (titre absent de l'index Movix)")
+                links_direct = self._get_links(
+                    tmdb_id, tmdb_id, media_type,
+                    shared_state, SEARCH_REQUEST_TIMEOUT_SECONDS,
+                    season=season, episode=episode
+                )
+                if links_direct:
+                    match = {"id": tmdb_id, "name": title, "tmdb_id": tmdb_id,
+                             "imdb_id": imdb_id, "is_series": media_type == "tv", "year": ""}
+                    releases = self._build_releases(match, links_direct, shared_state,
+                                                    SEARCH_REQUEST_TIMEOUT_SECONDS,
+                                                    req_season=season, req_episode=episode)
+                    if releases:
+                        clear_hostname_issue(self.initials)
+                else:
+                    warn(f"[mx] '{title}' (IMDb:{imdb_id} TMDB:{tmdb_id}) introuvable sur Movix")
+                return releases
 
             if not match:
                 warn(f"[mx] '{title}' (IMDb:{imdb_id} TMDB:{tmdb_id}) introuvable sur Movix")
