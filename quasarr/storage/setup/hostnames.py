@@ -147,6 +147,8 @@ def hostname_form_html(shared_state, message, show_skip_management=False):
         "Save", "primary", {"type": "submit", "id": "submitBtn"}
     )
     stored_url = Config("Settings").get("hostnames_url") or ""
+    stored_tmdb_key = Config("MX").get("tmdb_api_key") or ""
+    mx_configured = "true" if (Config("Hostnames").get("mx") or "") else "false"
     skip_flaresolverr_db = DataBase("skip_flaresolverr")
     is_flaresolverr_skipped = bool(skip_flaresolverr_db.retrieve("skipped"))
 
@@ -242,6 +244,18 @@ def hostname_form_html(shared_state, message, show_skip_management=False):
     </p>
 </div>
 
+<div class="url-import-section" id="tmdbSection" style="display:{tmdb_display}">
+    <h3>🎬 TMDB API Key (optional)</h3>
+    <div class="url-import-row">
+        <input type="text" id="tmdbApiKeyInput" placeholder="eyJhbGciOiJIUzI1NiJ9..." value="{stored_tmdb_key}" autocomplete="off">
+        <button type="button" class="btn-secondary" onclick="saveTmdbKey()">Save</button>
+    </div>
+    <p style="font-size:0.75rem; color:var(--secondary, #6c757d); margin:0.5rem 0 0 0;">
+        Free key from <a href="https://www.themoviedb.org/settings/api" target="_blank">themoviedb.org</a> — used to resolve French titles via IMDb ID
+    </p>
+    <div id="tmdbSaveStatus" class="import-status"></div>
+</div>
+
 <form action="/api/hostnames" method="post" onsubmit="return validateHostnames(this)">
     <input type="hidden" id="hostnamesUrlHidden" name="hostnames_url" value="{stored_url}">
     {hostname_form_content}
@@ -271,6 +285,37 @@ def hostname_form_html(shared_state, message, show_skip_management=False):
 
     errorDiv.textContent = 'Please fill in at least one hostname!';
     return false;
+  }}
+
+  (function() {{
+    var mxInput = document.getElementById('mx');
+    var tmdbSection = document.getElementById('tmdbSection');
+    if (mxInput && tmdbSection) {{
+      mxInput.addEventListener('input', function() {{
+        tmdbSection.style.display = mxInput.value.trim() ? '' : 'none';
+      }});
+    }}
+  }})();
+
+  function saveTmdbKey() {{
+    var key = document.getElementById('tmdbApiKeyInput').value.trim();
+    var statusDiv = document.getElementById('tmdbSaveStatus');
+    statusDiv.className = 'import-status loading';
+    statusDiv.textContent = 'Saving...';
+    quasarrApiFetch('/api/settings/tmdb-key', {{
+      method: 'POST',
+      headers: {{ 'Content-Type': 'application/json' }},
+      body: JSON.stringify({{ tmdb_api_key: key }})
+    }})
+    .then(r => r.json())
+    .then(data => {{
+      statusDiv.className = data.success ? 'import-status success' : 'import-status error';
+      statusDiv.textContent = data.success ? (key ? 'Saved!' : 'Key cleared.') : (data.error || 'Save failed');
+    }})
+    .catch(err => {{
+      statusDiv.className = 'import-status error';
+      statusDiv.textContent = 'Network error: ' + err.message;
+    }});
   }}
 
   function importHostnames() {{
@@ -551,6 +596,8 @@ def hostname_form_html(shared_state, message, show_skip_management=False):
         hostname_form_content=hostname_form_content,
         button=button_html,
         stored_url=stored_url,
+        stored_tmdb_key=stored_tmdb_key,
+        tmdb_display="" if mx_configured == "true" else "none",
         is_flaresolverr_skipped="true" if is_flaresolverr_skipped else "false",
     )
 

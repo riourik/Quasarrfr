@@ -100,6 +100,19 @@ def setup_config(app, shared_state):
     def import_hostnames_route():
         return import_hostnames_from_url()
 
+    @app.post("/api/settings/tmdb-key")
+    @require_api_key
+    def save_tmdb_key():
+        response.content_type = "application/json"
+        try:
+            from quasarr.storage.config import Config
+            data = request.json or {}
+            key = (data.get("tmdb_api_key") or "").strip()
+            Config("MX").save("tmdb_api_key", key)
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     @app.get("/api/skip-login")
     @require_api_key
     def get_skip_login_route():

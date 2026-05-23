@@ -32,7 +32,6 @@ ENV PASS=""
 ENV INTERNAL_ADDRESS=""
 ENV EXTERNAL_ADDRESS=""
 ENV LOG_MAX_WIDTH="120"
-ENV MX_TMDB_API_KEY=""
 
 # Restart loop: exit 0 = restart, exit non-zero = stop container
 ENTRYPOINT ["sh", "-c", "while true; do quasarr; ret=$?; if [ $ret -ne 0 ]; then echo \"Quasarr exited with error $ret, stopping...\"; exit $ret; fi; echo \"Quasarr restarting...\"; sleep 2; done"]

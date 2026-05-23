@@ -77,10 +77,10 @@ class Source(AbstractSearchSource):
     def _get_links(self, darkiworld_id, tmdb_id, media_type, ss, timeout, season=None, episode=None):
         params = {"tmdbId": tmdb_id}
         if media_type == "tv":
-            if not season or not episode:
-                return []
-            params["season"] = season
-            params["episode"] = episode
+            if season is not None:
+                params["season"] = season
+            if episode is not None:
+                params["episode"] = episode
         data = self._get(
             MOVIX_API,
             f"/darkiworld/download/{media_type}/{darkiworld_id}",
@@ -170,7 +170,7 @@ class Source(AbstractSearchSource):
         except Exception:
             return datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")
 
-    def _build_releases(self, result, links, ss, timeout):
+    def _build_releases(self, result, links, ss, timeout, req_season=None, req_episode=None):
         releases = []
         darkiworld_id = result.get("id")
         r_title = result.get("name", "Unknown")
@@ -236,10 +236,12 @@ class Source(AbstractSearchSource):
             host_tag = f".{sanitize(host)}" if host else ""
             ep_tag = ""
             if result.get("is_series"):
-                saison = link.get("saison")
-                ep = link.get("episode")
-                if saison and ep:
+                saison = link.get("saison") if link.get("saison") is not None else req_season
+                ep = link.get("episode") if link.get("episode") is not None else req_episode
+                if saison is not None and ep is not None:
                     ep_tag = f".S{int(saison):02d}E{int(ep):02d}"
+                elif saison is not None:
+                    ep_tag = f".S{int(saison):02d}"
             safe_title = sanitize(r_title)
             safe_quality = normalize_quality(quality)
             if result.get("is_series"):
@@ -370,7 +372,8 @@ class Source(AbstractSearchSource):
                 shared_state, SEARCH_REQUEST_TIMEOUT_SECONDS,
                 season=season, episode=episode
             )
-            releases = self._build_releases(match, links, shared_state, SEARCH_REQUEST_TIMEOUT_SECONDS)
+            releases = self._build_releases(match, links, shared_state, SEARCH_REQUEST_TIMEOUT_SECONDS,
+                                             req_season=season, req_episode=episode)
 
             if releases:
                 clear_hostname_issue(self.initials)
