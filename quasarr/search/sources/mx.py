@@ -291,6 +291,11 @@ class Source(AbstractSearchSource):
                     ep_tag = f".S{int(saison):02d}E{int(ep):02d}"
                 elif saison is not None:
                     ep_tag = f".S{int(saison):02d}"
+                else:
+                    # Aucune info dans le lien → utiliser la requête Sonarr, sinon S01E01
+                    fallback_s = req_season if req_season is not None else 1
+                    fallback_e = req_episode if req_episode is not None else 1
+                    ep_tag = f".S{int(fallback_s):02d}E{int(fallback_e):02d}"
             safe_title = sanitize(r_title)
             safe_quality = normalize_quality(quality)
             if result.get("is_series"):
