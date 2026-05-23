@@ -5,7 +5,7 @@
 import re
 import sys
 
-__version__ = "4.3.7.04"
+__version__ = "4.3.7.06"
 
 
 def get_version():

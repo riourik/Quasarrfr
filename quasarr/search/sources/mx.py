@@ -60,6 +60,9 @@ class Source(AbstractSearchSource):
                    "Origin": "https://movix.cash"}
         try:
             r = requests.get(f"{base}{path}", params=params, headers=headers, timeout=timeout)
+            if r.status_code == 500:
+                debug(f"[mx] GET {path} — 500 (titre non supporté par Movix)")
+                return None
             r.raise_for_status()
             return r.json()
         except Exception as e:
@@ -73,6 +76,13 @@ class Source(AbstractSearchSource):
     def _search_title(self, title, ss, timeout):
         data = self._get(MOVIX_API, "/search", {"title": title}, ss, timeout)
         return data.get("results", []) if data else []
+
+    def _search_by_imdb(self, imdb_id, ss, timeout):
+        """Recherche Movix directement par IMDb ID (contourne les problèmes d'IDs désynchronisés)."""
+        data = self._get(MOVIX_API, "/search", {"imdb_id": imdb_id}, ss, timeout)
+        if data and data.get("results"):
+            return data.get("results", [])
+        return []
 
     def _get_links(self, darkiworld_id, tmdb_id, media_type, ss, timeout, season=None, episode=None):
         params = {"tmdbId": tmdb_id}
@@ -95,6 +105,13 @@ class Source(AbstractSearchSource):
         return []
 
     def _decode_link(self, link_id, darkiworld_id, ss, timeout):
+        # Certains liens Movix ont un id qui est déjà une URL directe
+        str_id = str(link_id)
+        if str_id.startswith("http://") or str_id.startswith("https://"):
+            return str_id
+        if str_id.startswith("movix:"):
+            return str_id[len("movix:"):]
+
         data = self._get(
             MOVIX_API,
             f"/darkiworld/decode/{link_id}",
@@ -111,7 +128,11 @@ class Source(AbstractSearchSource):
     # ------------------------------------------------------------------ #
 
     def _tmdb_key(self, ss):
-        return os.environ.get("MX_TMDB_API_KEY") or ss.values["config"]("MX").get("tmdb_api_key") or ""
+        try:
+            custom = os.environ.get("MX_TMDB_API_KEY") or ss.values["config"]("MX").get("tmdb_api_key")
+            return custom or TMDB_KEY
+        except Exception:
+            return TMDB_KEY
 
     def _resolve_imdb(self, imdb_id, ss, timeout):
         tmdb_key = self._tmdb_key(ss)
@@ -146,7 +167,7 @@ class Source(AbstractSearchSource):
     #  Helpers                                                             #
     # ------------------------------------------------------------------ #
 
-    def _best_match(self, results, imdb_id=None, tmdb_id=None):
+    def _best_match(self, results, imdb_id=None, tmdb_id=None, media_type=None):
         if imdb_id:
             for r in results:
                 if r.get("imdb_id") == imdb_id:
@@ -155,7 +176,16 @@ class Source(AbstractSearchSource):
             for r in results:
                 if str(r.get("tmdb_id")) == str(tmdb_id):
                     return r
-        # Only fall back to first result when no IDs were provided (pure text search)
+        # Fallback par type : série → premier is_series=True, film → premier is_series=False
+        if media_type == "tv":
+            for r in results:
+                if r.get("is_series"):
+                    return r
+        elif media_type == "movie":
+            for r in results:
+                if not r.get("is_series"):
+                    return r
+        # Fallback générique si aucun ID fourni
         if not imdb_id and not tmdb_id:
             return results[0] if results else None
         return None
@@ -354,20 +384,24 @@ class Source(AbstractSearchSource):
             warn(f"[mx] impossible de résoudre: {search_string}")
             return []
 
-        warn(f"[mx] recherche '{title}' (TMDB:{tmdb_id}) [{media_type}] S{season}E{episode} — IMDb: {imdb_id}")
+        debug(f"[mx] recherche '{title}' (TMDB:{tmdb_id}) [{media_type}] S{season}E{episode} — IMDb: {imdb_id}")
 
         releases = []
         try:
             results = self._search_title(title, shared_state, SEARCH_REQUEST_TIMEOUT_SECONDS)
-            if not results:
-                warn(f"[mx] aucun résultat Movix pour: {title}")
-                return []
+            match = self._best_match(results, imdb_id=imdb_id, tmdb_id=tmdb_id, media_type=media_type) if results else None
 
-            warn(f"[mx] {len(results)} résultat(s) Movix — ids: {[(r.get('imdb_id'), r.get('tmdb_id'), r.get('name')) for r in results[:3]]}")
-            match = self._best_match(results, imdb_id=imdb_id, tmdb_id=tmdb_id)
+            # Si pas de match par titre+ID, essayer recherche directe par IMDb ID
+            if not match and imdb_id:
+                debug(f"[mx] recherche directe par IMDb ID: {imdb_id}")
+                results_imdb = self._search_by_imdb(imdb_id, shared_state, SEARCH_REQUEST_TIMEOUT_SECONDS)
+                if results_imdb:
+                    match = results_imdb[0]
+                    debug(f"[mx] trouvé via IMDb direct: {match.get('name')} (TMDB:{match.get('tmdb_id')})")
+
             if not match:
-                warn(f"[mx] aucun match par ID — fallback sur premier résultat: {results[0].get('name')}")
-                match = results[0]
+                warn(f"[mx] '{title}' (IMDb:{imdb_id} TMDB:{tmdb_id}) introuvable sur Movix")
+                return []
 
             links = self._get_links(
                 match["id"], match.get("tmdb_id"), media_type,
@@ -383,5 +417,5 @@ class Source(AbstractSearchSource):
             mark_hostname_issue(self.initials, "search", str(e))
             warn(f"[mx] search error: {e}")
 
-        warn(f"[mx] {len(releases)} liens pour '{title}' — {time.time() - start_time:.2f}s")
+        debug(f"[mx] {len(releases)} liens pour '{title}' — {time.time() - start_time:.2f}s")
         return releases
