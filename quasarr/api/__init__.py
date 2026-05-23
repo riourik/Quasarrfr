@@ -610,7 +610,7 @@ def get_api(shared_state_dict, shared_state_lock):
                 margin: 0;
                 flex-shrink: 0;
             }}
-            #saveTmdbKeyBtn {
+            #saveTmdbKeyBtn {{
                 background: var(--btn-primary-bg, #007bff);
                 color: white;
             }}
