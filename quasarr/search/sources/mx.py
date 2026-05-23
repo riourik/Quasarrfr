@@ -354,7 +354,7 @@ class Source(AbstractSearchSource):
             warn(f"[mx] impossible de résoudre: {search_string}")
             return []
 
-        debug(f"[mx] recherche '{title}' (TMDB:{tmdb_id}) [{media_type}] S{season}E{episode} — IMDb: {imdb_id}")
+        warn(f"[mx] recherche '{title}' (TMDB:{tmdb_id}) [{media_type}] S{season}E{episode} — IMDb: {imdb_id}")
 
         releases = []
         try:
@@ -363,9 +363,11 @@ class Source(AbstractSearchSource):
                 warn(f"[mx] aucun résultat Movix pour: {title}")
                 return []
 
+            warn(f"[mx] {len(results)} résultat(s) Movix — ids: {[(r.get('imdb_id'), r.get('tmdb_id'), r.get('name')) for r in results[:3]]}")
             match = self._best_match(results, imdb_id=imdb_id, tmdb_id=tmdb_id)
             if not match:
-                return []
+                warn(f"[mx] aucun match par ID — fallback sur premier résultat: {results[0].get('name')}")
+                match = results[0]
 
             links = self._get_links(
                 match["id"], match.get("tmdb_id"), media_type,
@@ -381,5 +383,5 @@ class Source(AbstractSearchSource):
             mark_hostname_issue(self.initials, "search", str(e))
             warn(f"[mx] search error: {e}")
 
-        debug(f"[mx] {len(releases)} liens pour '{title}' — {time.time() - start_time:.2f}s")
+        warn(f"[mx] {len(releases)} liens pour '{title}' — {time.time() - start_time:.2f}s")
         return releases
